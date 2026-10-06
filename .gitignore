@@ -1,0 +1,13 @@
+# Dependencias
+/node_modules
+
+# Compilación de Next.js
+/.next/
+/out/
+
+# Variables de entorno secretas (SÚPER IMPORTANTE)
+.env
+.env*.local
+
+# Archivos del sistema
+.DS_Store
