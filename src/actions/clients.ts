@@ -16,9 +16,13 @@ export async function getClients() {
   return data ?? []
 }
 
-export async function createClient(name: string, email: string) {
-  if (!name.trim() || !email.trim()) {
-    throw new Error('Nombre y correo electrónico son obligatorios')
+export async function createClient(
+  name: string,
+  taxId: string,
+  email?: string
+) {
+  if (!name.trim() || !taxId.trim()) {
+    throw new Error('Nombre y RFC / identificación fiscal son obligatorios')
   }
 
   const supabase = createServerSupabaseClient()
@@ -28,7 +32,8 @@ export async function createClient(name: string, email: string) {
     .insert([
       {
         name: name.trim(),
-        email: email.trim(),
+        tax_id: taxId.trim(),
+        email: email?.trim() || null,
       },
     ])
     .select()
