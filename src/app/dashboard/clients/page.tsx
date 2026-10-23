@@ -1,141 +1,319 @@
 'use client'
 
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useState } from 'react'
 import { createClient, getClients } from '@/actions/clients'
 
 type Client = {
   id: string
   name: string
-  email: string
+  tax_id: string
+  email: string | null
+  phone: string | null
+  address: string | null
+  created_at: string
+  user_id: string | null
 }
 
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
+
   const [name, setName] = useState('')
+  const [taxId, setTaxId] = useState('')
   const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
+  const [address, setAddress] = useState('')
 
-  useEffect(() => {
-    void fetchClients()
-  }, [])
-
-  async function fetchClients() {
+  const fetchClients = useCallback(async () => {
     setLoading(true)
+    setError('')
 
     try {
       const data = await getClients()
-      setClients(data as Client[])
+      setClients(data)
     } catch (error) {
-      console.error('Error cargando clientes:', error)
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Error desconocido al cargar clientes.'
+
+      setError(message)
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  async function handleAddClient(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault()
+  useEffect(() => {
+    void fetchClients()
+  }, [fetchClients])
 
-    if (!name.trim() || !email.trim()) return
+  async function handleAddClient(
+    event: FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault()
+
+    setError('')
+    setMessage('')
+
+    if (!name.trim() || !taxId.trim()) {
+      setError(
+        'Nombre y RFC / identificación fiscal son obligatorios.'
+      )
+      return
+    }
+
+    setSaving(true)
 
     try {
-      await createClient(name, email)
+      await createClient(
+        name,
+        taxId,
+        email,
+        phone,
+        address
+      )
 
       setName('')
+      setTaxId('')
       setEmail('')
+      setPhone('')
+      setAddress('')
+
+      setMessage('Cliente registrado correctamente.')
 
       await fetchClients()
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Error desconocido'
+        error instanceof Error
+          ? error.message
+          : 'Error desconocido al guardar el cliente.'
 
-      alert('Error guardando cliente: ' + message)
+      setError(message)
+    } finally {
+      setSaving(false)
     }
   }
 
   return (
-    <div className="mx-auto min-h-screen max-w-4xl bg-white p-6 text-black">
-      <h1 className="mb-6 text-2xl font-bold text-gray-900">
-        Gestión de Clientes
-      </h1>
+    <main className="mx-auto max-w-6xl p-6">
+      <div className="mb-8">
+        <h2 className="text-2xl font-bold text-gray-900">
+          Gestión de Clientes
+        </h2>
 
-      <form onSubmit={handleAddClient} className="mb-8 flex gap-4">
-        <input
-          type="text"
-          placeholder="Nombre del cliente"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="flex-1 rounded border border-gray-300 bg-white p-2 text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          required
-        />
+        <p className="mt-1 text-sm text-gray-600">
+          Registra y consulta los clientes de tu cuenta.
+        </p>
+      </div>
 
-        <input
-          type="email"
-          placeholder="Correo electrónico"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="flex-1 rounded border border-gray-300 bg-white p-2 text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          required
-        />
+      <section className="mb-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <h3 className="mb-5 text-lg font-semibold text-gray-900">
+          Nuevo cliente
+        </h3>
 
-        <button
-          type="submit"
-          className="rounded bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700"
+        <form
+          onSubmit={handleAddClient}
+          className="grid gap-4 md:grid-cols-2"
         >
-          Agregar
-        </button>
-      </form>
+          <div>
+            <label
+              htmlFor="name"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
+              Nombre *
+            </label>
 
-      {loading ? (
-        <p className="text-gray-600">Cargando clientes...</p>
-      ) : (
-        <table className="w-full border-collapse border border-gray-200 bg-white">
-          <thead>
-            <tr className="bg-gray-100 text-gray-900">
-              <th className="border border-gray-200 p-2 text-left font-semibold">
-                ID
-              </th>
-              <th className="border border-gray-200 p-2 text-left font-semibold">
-                Nombre
-              </th>
-              <th className="border border-gray-200 p-2 text-left font-semibold">
-                Email
-              </th>
-            </tr>
-          </thead>
+            <input
+              id="name"
+              type="text"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Nombre del cliente"
+              required
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+            />
+          </div>
 
-          <tbody>
-            {clients.map((client) => (
-              <tr
-                key={client.id}
-                className="text-gray-800 hover:bg-gray-50"
-              >
-                <td className="border border-gray-200 p-2 font-mono text-xs">
-                  {client.id}
-                </td>
+          <div>
+            <label
+              htmlFor="taxId"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
+              RFC / Identificación fiscal *
+            </label>
 
-                <td className="border border-gray-200 p-2">
-                  {client.name}
-                </td>
+            <input
+              id="taxId"
+              type="text"
+              value={taxId}
+              onChange={(event) =>
+                setTaxId(event.target.value.toUpperCase())
+              }
+              placeholder="RFC o identificación fiscal"
+              required
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+            />
+          </div>
 
-                <td className="border border-gray-200 p-2">
-                  {client.email}
-                </td>
-              </tr>
-            ))}
+          <div>
+            <label
+              htmlFor="email"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
+              Correo electrónico
+            </label>
 
-            {clients.length === 0 && (
-              <tr>
-                <td
-                  colSpan={3}
-                  className="p-4 text-center text-gray-500"
-                >
-                  No hay clientes registrados.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      )}
-    </div>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="cliente@ejemplo.com"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="phone"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
+              Teléfono
+            </label>
+
+            <input
+              id="phone"
+              type="tel"
+              value={phone}
+              onChange={(event) => setPhone(event.target.value)}
+              placeholder="Teléfono del cliente"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <label
+              htmlFor="address"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
+              Dirección
+            </label>
+
+            <textarea
+              id="address"
+              value={address}
+              onChange={(event) => setAddress(event.target.value)}
+              placeholder="Dirección del cliente"
+              rows={3}
+              className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <button
+              type="submit"
+              disabled={saving}
+              className="rounded-lg bg-blue-600 px-5 py-2 font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {saving ? 'Guardando...' : 'Agregar cliente'}
+            </button>
+          </div>
+        </form>
+
+        {error && (
+          <div className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        {message && (
+          <div className="mt-4 rounded-lg bg-green-50 p-3 text-sm text-green-700">
+            {message}
+          </div>
+        )}
+      </section>
+
+      <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div className="border-b border-gray-200 px-6 py-4">
+          <h3 className="text-lg font-semibold text-gray-900">
+            Clientes registrados
+          </h3>
+        </div>
+
+        {loading ? (
+          <div className="p-6">
+            <p className="text-gray-600">
+              Cargando clientes...
+            </p>
+          </div>
+        ) : clients.length === 0 ? (
+          <div className="p-8 text-center">
+            <p className="text-gray-500">
+              No hay clientes registrados.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                    Nombre
+                  </th>
+
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                    RFC
+                  </th>
+
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                    Correo
+                  </th>
+
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                    Teléfono
+                  </th>
+
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                    Dirección
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-gray-200">
+                {clients.map((client) => (
+                  <tr
+                    key={client.id}
+                    className="hover:bg-gray-50"
+                  >
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                      {client.name}
+                    </td>
+
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      {client.tax_id}
+                    </td>
+
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      {client.email || '—'}
+                    </td>
+
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      {client.phone || '—'}
+                    </td>
+
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      {client.address || '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </main>
   )
 }

@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/client'
 
 type DashboardLayoutProps = {
   children: ReactNode
@@ -13,6 +13,8 @@ export default function DashboardLayout({
   children,
 }: DashboardLayoutProps) {
   const router = useRouter()
+  const supabase = createClient()
+
   const [loading, setLoading] = useState(true)
   const [authenticated, setAuthenticated] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
@@ -57,7 +59,7 @@ export default function DashboardLayout({
       mounted = false
       subscription.unsubscribe()
     }
-  }, [router])
+  }, [router, supabase])
 
   async function handleLogout() {
     setLoggingOut(true)
