@@ -1,7 +1,12 @@
 'use client'
 
 import { FormEvent, useCallback, useEffect, useState } from 'react'
-import { createClient, getClients } from '@/actions/clients'
+import {
+  createClient,
+  deleteClient,
+  getClients,
+  updateClient,
+} from '@/actions/clients'
 
 type Client = {
   id: string
@@ -18,8 +23,11 @@ export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   const [name, setName] = useState('')
   const [taxId, setTaxId] = useState('')
@@ -50,7 +58,39 @@ export default function ClientsPage() {
     void fetchClients()
   }, [fetchClients])
 
-  async function handleAddClient(
+  function clearForm() {
+    setEditingId(null)
+    setName('')
+    setTaxId('')
+    setEmail('')
+    setPhone('')
+    setAddress('')
+  }
+
+  function handleEdit(client: Client) {
+    setError('')
+    setMessage('')
+
+    setEditingId(client.id)
+    setName(client.name)
+    setTaxId(client.tax_id)
+    setEmail(client.email ?? '')
+    setPhone(client.phone ?? '')
+    setAddress(client.address ?? '')
+
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    })
+  }
+
+  function handleCancelEdit() {
+    clearForm()
+    setError('')
+    setMessage('')
+  }
+
+  async function handleSubmit(
     event: FormEvent<HTMLFormElement>
   ) {
     event.preventDefault()
@@ -68,32 +108,78 @@ export default function ClientsPage() {
     setSaving(true)
 
     try {
-      await createClient(
-        name,
-        taxId,
-        email,
-        phone,
-        address
-      )
+      if (editingId) {
+        await updateClient(
+          editingId,
+          name,
+          taxId,
+          email,
+          phone,
+          address
+        )
 
-      setName('')
-      setTaxId('')
-      setEmail('')
-      setPhone('')
-      setAddress('')
+        clearForm()
+        setMessage('Cliente actualizado correctamente.')
+      } else {
+        await createClient(
+          name,
+          taxId,
+          email,
+          phone,
+          address
+        )
 
-      setMessage('Cliente registrado correctamente.')
+        clearForm()
+        setMessage('Cliente registrado correctamente.')
+      }
 
       await fetchClients()
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
-          : 'Error desconocido al guardar el cliente.'
+          : editingId
+            ? 'Error desconocido al actualizar el cliente.'
+            : 'Error desconocido al guardar el cliente.'
 
       setError(message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleDelete(client: Client) {
+    const confirmed = window.confirm(
+      `¿Estás seguro de que deseas eliminar al cliente "${client.name}"?`
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    setError('')
+    setMessage('')
+    setDeletingId(client.id)
+
+    try {
+      await deleteClient(client.id)
+
+      if (editingId === client.id) {
+        clearForm()
+      }
+
+      setMessage('Cliente eliminado correctamente.')
+
+      await fetchClients()
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Error desconocido al eliminar el cliente.'
+
+      setError(message)
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -105,17 +191,17 @@ export default function ClientsPage() {
         </h2>
 
         <p className="mt-1 text-sm text-gray-600">
-          Registra y consulta los clientes de tu cuenta.
+          Registra, consulta, edita y elimina los clientes de tu cuenta.
         </p>
       </div>
 
       <section className="mb-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <h3 className="mb-5 text-lg font-semibold text-gray-900">
-          Nuevo cliente
+          {editingId ? 'Editar cliente' : 'Nuevo cliente'}
         </h3>
 
         <form
-          onSubmit={handleAddClient}
+          onSubmit={handleSubmit}
           className="grid gap-4 md:grid-cols-2"
         >
           <div>
@@ -212,14 +298,29 @@ export default function ClientsPage() {
             />
           </div>
 
-          <div className="md:col-span-2">
+          <div className="flex gap-3 md:col-span-2">
             <button
               type="submit"
               disabled={saving}
               className="rounded-lg bg-blue-600 px-5 py-2 font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {saving ? 'Guardando...' : 'Agregar cliente'}
+              {saving
+                ? 'Guardando...'
+                : editingId
+                  ? 'Guardar cambios'
+                  : 'Agregar cliente'}
             </button>
+
+            {editingId && (
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                disabled={saving}
+                className="rounded-lg border border-gray-300 bg-white px-5 py-2 font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+            )}
           </div>
         </form>
 
@@ -279,6 +380,10 @@ export default function ClientsPage() {
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
                     Dirección
                   </th>
+
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                    Acciones
+                  </th>
                 </tr>
               </thead>
 
@@ -306,6 +411,30 @@ export default function ClientsPage() {
 
                     <td className="px-4 py-3 text-sm text-gray-700">
                       {client.address || '—'}
+                    </td>
+
+                    <td className="px-4 py-3">
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleEdit(client)}
+                          disabled={deletingId === client.id}
+                          className="rounded-lg bg-amber-500 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Editar
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => void handleDelete(client)}
+                          disabled={deletingId === client.id}
+                          className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {deletingId === client.id
+                            ? 'Eliminando...'
+                            : 'Eliminar'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
